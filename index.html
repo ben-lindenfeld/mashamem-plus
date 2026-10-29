@@ -194,7 +194,7 @@ ${w?`<p><b>${esc(w.t)}</b> - יום ${n(w.checks.length)} מתוך 7</p><div cla
 let v2engine=null,v2loading=false;
 function v2ai(){app.innerHTML=`<section><h1>${ic('robot',26)} עוזר חכם</h1><p class="intro">תשובות קבועות לשאלות נפוצות - ולמטה, אופציה ל-AI אמיתי שרץ במכשיר שלך.</p>
 <div class="v2card"><b>AI אמיתי (בטא)</b><p class="v2muted">בלי חשבון ובלי תשלום. הצ'אט עצמו מחושב על המכשיר שלך; בלחיצה למטה מורד מהאינטרנט מודל Qwen2.5-0.5B (כ-300MB, עדיף ב-wifi) ונשמר במכשיר - אם הדפדפן ינקה אחסון, תידרש הורדה חוזרת. דורש דפדפן חדש עם WebGPU - באייפון: iOS 26 ומעלה. שים לב: התכונה עדיין בבדיקות ולא הוכחה על מכשיר אמיתי - אם משהו לא יעבוד, תופיע הודעה ברורה והתשובות הקבועות נשארות.</p>
-<div id="v2-ai-box">${v2engine?`<div id="v2-ai-log"></div><div class="v2row"><input class="v2in" id="v2-ai-q" placeholder="שאל שאלה..." style="flex:1"><button class="primary" data-v2="ai-send">שלח</button></div>`:'<button class="primary" data-v2="ai-beta">הפעל AI אמיתי</button>'}<div id="v2-ai-status" class="v2muted"></div></div></div>
+<div id="v2-ai-box"><div id="v2-ai-log">${(state.aiLog||[]).map(m=>`<p><b>אתה:</b> ${esc(m.q)}</p><p class="v2muted"><b>AI:</b> ${m.a?esc(m.a):'התשובה הופסקה באמצע - שלח שוב'}${m.cut?' (הופסק)':''}</p>`).join('')}</div>${v2engine?`<div class="v2row"><input class="v2in" id="v2-ai-q" placeholder="שאל שאלה..." style="flex:1"><button class="primary" data-v2="ai-send">שלח</button></div>`:'<button class="primary" data-v2="ai-beta">הפעל AI אמיתי</button>'}<div id="v2-ai-status" class="v2muted"></div></div></div>
 ${V2_AI.map((x,i)=>`<div class="v2card"><b>${esc(x.q)}</b><p class="v2muted">${esc(x.a)}</p></div>`).join('')}</section>`}
 async function v2aiLoad(){if(v2loading||v2engine)return;v2loading=true;const st=document.getElementById('v2-ai-status');
 try{
@@ -209,11 +209,11 @@ render()}catch(err){v2engine=null;if(st)st.textContent='לא הצלחתי להפ
 v2loading=false}
 let v2gen=false;
 async function v2aiSend(){const inp=document.getElementById('v2-ai-q'),log=document.getElementById('v2-ai-log');if(!inp||!log||!v2engine||v2gen)return;const q=inp.value.trim();if(!q)return;inp.value='';if(state.drafts)delete state.drafts['v2-ai-q'];v2gen=true;
-log.innerHTML+=`<p><b>אתה:</b> ${esc(q)}</p><p class="v2muted"><b>AI:</b> <span id="v2-ai-cur"></span></p>`;const cur=document.getElementById('v2-ai-cur');
+log.innerHTML+=`<p><b>אתה:</b> ${esc(q)}</p><p class="v2muted"><b>AI:</b> <span id="v2-ai-cur"></span></p>`;const cur=document.getElementById('v2-ai-cur');state.aiLog=state.aiLog||[];const entry={q,a:'',cut:false};state.aiLog.push(entry);persist();
 let cancelled=false;const to=setTimeout(async()=>{cancelled=true;try{await v2engine.interruptGenerate()}catch(e){}if(cur)cur.textContent='לקח יותר מדי זמן - נסה שאלה קצרה יותר, או תסגור ותפתח מחדש את ה-AI'},90000);
-try{const stream=await v2engine.chat.completions.create({messages:[{role:'system',content:'You are a friendly, encouraging assistant for a 13-year-old boy. Answer briefly in simple Hebrew. General wellness only: never discuss diets, calories, weight or medical advice.'},{role:'user',content:q}],stream:true,max_tokens:256});
-let full='';for await(const chunk of stream){if(cancelled)break;const t=chunk.choices[0]?.delta?.content||'';full+=t;if(cur)cur.textContent=full}}catch(err){if(cur&&!cancelled)cur.textContent='שגיאה - נסה שוב'}
-clearTimeout(to);v2gen=false}
+let full='';try{const stream=await v2engine.chat.completions.create({messages:[{role:'system',content:'You are a friendly, encouraging assistant for a 13-year-old boy. Answer briefly in simple Hebrew. General wellness only: never discuss diets, calories, weight or medical advice.'},{role:'user',content:q}],stream:true,max_tokens:256});
+for await(const chunk of stream){if(cancelled)break;const t=chunk.choices[0]?.delta?.content||'';full+=t;if(cur)cur.textContent=full}}catch(err){if(cur&&!cancelled)cur.textContent='שגיאה - נסה שוב'}
+entry.a=full;entry.cut=cancelled;persist();clearTimeout(to);v2gen=false}
 const v2oldHome=home;
 const V2_ROUTES={home:v2home,ideas:v2oldHome,morning:v2morningRoute,'morning-edit':v2morning,sleep:v2sleep,water:v2water,habits:v2habits,calendar:v2calendar,levels:v2levels,challenges:v2challenges,ai:v2ai};
 render=function(){nav();const route=location.hash.slice(1)||'home';if(state.lastRoute!==route){state.lastRoute=route;persist()}(V2_ROUTES[route]||({saved,history,settings,idea:ideas}[route]||v2home))();if(state.drafts)for(const k in state.drafts){const el=document.getElementById(k);if(el&&el.value!==state.drafts[k])el.value=state.drafts[k]}};
